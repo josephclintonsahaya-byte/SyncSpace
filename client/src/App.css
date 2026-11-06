@@ -1,0 +1,79 @@
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #0f172a;
+}
+
+.app {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+}
+
+.room-card {
+  width: 100%;
+  max-width: 450px;
+  background: #1e293b;
+  padding: 40px;
+  border-radius: 16px;
+  text-align: center;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.title {
+  color: #60a5fa;
+  font-size: 36px;
+  margin-bottom: 10px;
+}
+
+.subtitle {
+  color: #94a3b8;
+  margin-bottom: 30px;
+}
+
+.room-input {
+  width: 100%;
+  padding: 14px;
+  border: 1px solid #475569;
+  border-radius: 8px;
+  background: #0f172a;
+  color: white;
+  font-size: 16px;
+  margin-bottom: 15px;
+}
+
+.room-input:focus {
+  outline: 2px solid #3b82f6;
+}
+
+.create-btn {
+  width: 100%;
+  padding: 14px;
+  border: none;
+  border-radius: 8px;
+  background: #2563eb;
+  color: white;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.create-btn:hover {
+  background: #1d4ed8;
+}
+
+.success-box {
+  margin-top: 25px;
+  padding: 20px;
+  background: #064e3b;
+  color: #a7f3d0;
+  border-radius: 10px;
+  overflow-wrap: anywhere;
+}
