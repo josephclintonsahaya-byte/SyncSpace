@@ -33,6 +33,22 @@ app.get("/api/about", (req, res) => {
 io.on("connection", (socket) => {
   console.log("User connected:", socket.id);
 
+  // Chat synchronization
+  socket.on("chatMessage", (message) => {
+    console.log("Message received:", message);
+    socket.broadcast.emit("chatMessage", message);
+  });
+
+  // Drawing synchronization
+  socket.on("drawing", (line) => {
+    socket.broadcast.emit("drawing", line);
+  });
+
+  // Clear canvas synchronization
+  socket.on("clearCanvas", () => {
+    socket.broadcast.emit("clearCanvas");
+  });
+
   socket.on("disconnect", () => {
     console.log("User disconnected:", socket.id);
   });
