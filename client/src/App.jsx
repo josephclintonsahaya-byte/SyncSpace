@@ -1,6 +1,6 @@
 
 import { useState, useEffect, useRef } from "react";
-import { Stage, Layer, Line, Rect } from "react-konva";
+import { Stage, Layer, Line, Rect, Text } from "react-konva";
 import socket from "./socket";
 
 function App() {
@@ -10,6 +10,12 @@ const [brushColor, setBrushColor] = useState("#000000");
   const [brushSize, setBrushSize] = useState(3);
   const [isEraser, setIsEraser] = useState(false);
   const currentLineId = useRef(null);
+  const [isRectangle, setIsRectangle] = useState(false);
+  const [currentRect, setCurrentRect] = useState(null);
+const [startPosition, setStartPosition] = useState(null);
+const [isTextMode, setIsTextMode] = useState(false);
+const [textInput, setTextInput] = useState("");
+const [currentText, setCurrentText] = useState(null);
 
   // Receive other users' drawings
   useEffect(() => {
@@ -48,6 +54,35 @@ const [brushColor, setBrushColor] = useState("#000000");
 const handleMouseDown = (e) => {
   const pos = e.target.getStage().getPointerPosition();
 
+ if (isTextMode && textInput.trim()) {
+  const newText = {
+    id: crypto.randomUUID(),
+    type: "text",
+    x: pos.x,
+    y: pos.y,
+    text: textInput,
+    color: brushColor,
+    fontSize: 24,
+  };
+
+  setLines((previousLines) => [
+    ...previousLines,
+    newText,
+  ]);
+
+  socket.emit("drawing", newText);
+
+  setCurrentText(null);
+  return;
+}
+  if (isRectangle) {
+    setStartPosition({
+      x: pos.x,
+      y: pos.y,
+    });
+    return;
+  }
+
   const newLine = {
     id: crypto.randomUUID(),
     points: [pos.x, pos.y],
@@ -55,7 +90,6 @@ const handleMouseDown = (e) => {
     width: isEraser ? 20 : brushSize,
   };
 
-  // Store current stroke ID
   currentLineId.current = newLine.id;
 
   setIsDrawing(true);
@@ -69,15 +103,26 @@ const handleMouseDown = (e) => {
 };
 
 
-
   // Continue drawing
   
 
 const handleMouseMove = (e) => {
-  if (!isDrawing || !currentLineId.current) return;
+  const pos = e.target.getStage().getPointerPosition();
 
-  const stage = e.target.getStage();
-  const pos = stage.getPointerPosition();
+  // Rectangle drawing
+  if (isRectangle && startPosition) {
+    setCurrentRect({
+      x: Math.min(startPosition.x, pos.x),
+      y: Math.min(startPosition.y, pos.y),
+      width: Math.abs(pos.x - startPosition.x),
+      height: Math.abs(pos.y - startPosition.y),
+    });
+
+    return;
+  }
+
+  // Existing freehand drawing
+  if (!isDrawing || !currentLineId.current) return;
 
   const lineId = currentLineId.current;
 
@@ -90,11 +135,7 @@ const handleMouseMove = (e) => {
 
     const updatedLine = {
       ...currentLine,
-      points: [
-        ...currentLine.points,
-        pos.x,
-        pos.y,
-      ],
+      points: [...currentLine.points, pos.x, pos.y],
     };
 
     socket.emit("drawing", updatedLine);
@@ -105,15 +146,45 @@ const handleMouseMove = (e) => {
   });
 };
 
-
   // Stop drawing
  
 
-const handleMouseUp = () => {
+const handleMouseUp = (e) => {
+  if (isRectangle && startPosition) {
+    const pos = e.target.getStage().getPointerPosition();
+
+    const rect = {
+      x: Math.min(startPosition.x, pos.x),
+      y: Math.min(startPosition.y, pos.y),
+      width: Math.abs(pos.x - startPosition.x),
+      height: Math.abs(pos.y - startPosition.y),
+    };
+
+    if (rect.width > 0 && rect.height > 0) {
+      const newRect = {
+        id: crypto.randomUUID(),
+        type: "rectangle",
+        ...rect,
+        color: brushColor,
+        strokeWidth: brushSize,
+      };
+
+      setLines((previousLines) => [
+        ...previousLines,
+        newRect,
+      ]);
+
+      socket.emit("drawing", newRect);
+    }
+
+    setCurrentRect(null);
+    setStartPosition(null);
+    return;
+  }
+
   setIsDrawing(false);
   currentLineId.current = null;
 };
-
 
 
   // Clear canvas for all users
@@ -152,6 +223,21 @@ const handleMouseUp = () => {
           {isEraser ? "Brush" : "Eraser"}
         </button>
 
+        <button onClick={() => setIsRectangle(!isRectangle)}>
+  {isRectangle ? "Brush" : "Rectangle"}
+</button>
+
+<input
+  type="text"
+  placeholder="Enter text..."
+  value={textInput}
+  onChange={(e) => setTextInput(e.target.value)}
+/>
+
+<button onClick={() => setIsTextMode(!isTextMode)}>
+  {isTextMode ? "Brush" : "Text"}
+</button>
+
         <button onClick={handleClearCanvas}>
           Clear Canvas
         </button>
@@ -166,25 +252,84 @@ const handleMouseUp = () => {
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
       >
-        <Layer>
-          <Rect
-            width={800}
-            height={500}
-            fill="white"
-            listening={false}
-          />
 
-          {lines.map((line) => (
-            <Line
-              key={line.id}
-              points={line.points}
-              stroke={line.color}
-              strokeWidth={line.width}
-              lineCap="round"
-              lineJoin="round"
-            />
-          ))}
-        </Layer>
+        
+       <Layer>
+  {/* Whiteboard background */}
+  <Rect
+    width={800}
+    height={500}
+    fill="white"
+    listening={false}
+  />
+
+  {/* Permanent drawings */}
+  {lines.map((shape) => {
+  if (shape.type === "rectangle") {
+    return (
+      <Rect
+        key={shape.id}
+        x={shape.x}
+        y={shape.y}
+        width={shape.width}
+        height={shape.height}
+        stroke={shape.color}
+        strokeWidth={shape.strokeWidth}
+        fill="rgba(0,0,0,0)"
+      />
+    );
+  }
+
+  if (shape.type === "text") {
+    return (
+      <Text
+        key={shape.id}
+        x={shape.x}
+        y={shape.y}
+        text={shape.text}
+        fontSize={shape.fontSize}
+        fill={shape.color}
+      />
+    );
+  }
+
+  return (
+    <Line
+      key={shape.id}
+      points={shape.points}
+      stroke={shape.color}
+      strokeWidth={shape.width}
+      lineCap="round"
+      lineJoin="round"
+    />
+  );
+})}
+
+  {/* Rectangle preview */}
+  {currentRect && (
+    <Rect
+      x={currentRect.x}
+      y={currentRect.y}
+      width={currentRect.width}
+      height={currentRect.height}
+      stroke={brushColor}
+      strokeWidth={2}
+      fill="rgba(0,0,0,0)"
+      listening={false}
+    />
+  )}
+
+  {currentText && (
+  <Text
+    x={currentText.x}
+    y={currentText.y}
+    text={currentText.text}
+    fontSize={currentText.fontSize}
+    fill={currentText.color}
+    listening={false}
+  />
+)}
+</Layer>
       </Stage>
     </div>
   );
