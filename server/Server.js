@@ -1,14 +1,19 @@
 
+require("dotenv").config();
+
 const express = require("express");
 const http = require("http");
 const { Server } = require("socket.io");
 const cors = require("cors");
+const connectDB = require("./db");
 
 const app = express();
 
 app.use(cors({
   origin: "http://localhost:5173"
 }));
+
+app.use(express.json());
 
 const server = http.createServer(app);
 
@@ -54,6 +59,16 @@ io.on("connection", (socket) => {
   });
 });
 
-server.listen(5000, () => {
-  console.log("SyncSpace server running on port 5000");
-});
+const startServer = async () => {
+  try {
+    await connectDB();
+
+    server.listen(5000, () => {
+      console.log("SyncSpace server running on port 5000");
+    });
+  } catch (error) {
+    console.error("Server startup failed:", error.message);
+  }
+};
+
+startServer();
