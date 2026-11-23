@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import { Stage, Layer, Line, Rect, Text } from "react-konva";
 import socket from "./socket";
 
+
 function App() {
   const [lines, setLines] = useState([]);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -16,6 +17,61 @@ const [startPosition, setStartPosition] = useState(null);
 const [isTextMode, setIsTextMode] = useState(false);
 const [textInput, setTextInput] = useState("");
 const [currentText, setCurrentText] = useState(null);
+const [saveStatus, setSaveStatus] = useState("Saved");
+const [roomId, setRoomId] = useState("ROOM-12345");
+const [inputRoomId, setInputRoomId] = useState("");
+const [isLoading, setIsLoading] = useState(false);
+const [roomReady, setRoomReady] = useState(false);
+const [hasUserEdited, setHasUserEdited] = useState(false);
+const [isClearingCanvas, setIsClearingCanvas] = useState(false);
+
+useEffect(() => {
+  if (!roomReady || isLoading || !hasUserEdited || lines.length === 0) {
+    return;
+  }
+
+  const timer = setTimeout(() => {
+    saveWhiteboard();
+  }, 1000);
+
+  return () => clearTimeout(timer);
+}, [lines, roomReady, isLoading, hasUserEdited]);
+
+useEffect(() => {
+  const loadWhiteboard = async () => {
+    setRoomReady(false);
+    setIsLoading(true);
+    setHasUserEdited(false);
+    setLines([]);
+
+    try {
+      const response = await fetch(
+        `http://localhost:5000/api/whiteboards/${roomId}`
+      );
+
+      if (response.status === 404) {
+        console.log("New room - no saved drawings");
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error("Failed to load whiteboard");
+      }
+
+      const data = await response.json();
+
+      setLines(data.drawings || []);
+      console.log(`${roomId} loaded successfully`);
+    } catch (error) {
+      console.error("Load failed:", error);
+    } finally {
+      setIsLoading(false);
+      setRoomReady(true);
+    }
+  };
+
+  loadWhiteboard();
+}, [roomId]);
 
   // Receive other users' drawings
   useEffect(() => {
@@ -65,6 +121,8 @@ const handleMouseDown = (e) => {
     fontSize: 24,
   };
 
+  setHasUserEdited(true);
+
   setLines((previousLines) => [
     ...previousLines,
     newText,
@@ -93,6 +151,8 @@ const handleMouseDown = (e) => {
   currentLineId.current = newLine.id;
 
   setIsDrawing(true);
+
+  setHasUserEdited(true);
 
   setLines((previousLines) => [
     ...previousLines,
@@ -169,6 +229,8 @@ const handleMouseUp = (e) => {
         strokeWidth: brushSize,
       };
 
+      setHasUserEdited(true);
+
       setLines((previousLines) => [
         ...previousLines,
         newRect,
@@ -186,16 +248,70 @@ const handleMouseUp = (e) => {
   currentLineId.current = null;
 };
 
+const saveWhiteboard = async () => {
+  try {
+    setSaveStatus("Saving...");
+
+    const response = await fetch(
+      "http://localhost:5000/api/whiteboards",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          roomId,
+          drawings: lines,
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error("Save failed");
+    }
+
+    const data = await response.json();
+
+    console.log(data.message);
+    setSaveStatus("Saved");
+  } catch (error) {
+    console.error("Save failed:", error);
+    setSaveStatus("Error");
+  }
+};
+
 
   // Clear canvas for all users
-  const handleClearCanvas = () => {
-    setLines([]);
-    socket.emit("clearCanvas");
-  };
+  const handleClearCanvas = async () => {
+  setLines([]);
+  setHasUserEdited(false);
+  socket.emit("clearCanvas");
+
+  await saveWhiteboard([]);
+};
 
   return (
     <div>
       <h1>SyncSpace Whiteboard</h1>
+
+      <div>
+  <input
+    type="text"
+    placeholder="Enter Room ID"
+    value={inputRoomId}
+    onChange={(e) => setInputRoomId(e.target.value)}
+  />
+
+  <button
+    onClick={() => {
+      if (inputRoomId.trim() !== "") {
+        setRoomId(inputRoomId.trim());
+      }
+    }}
+  >
+    Join Room
+  </button>
+</div>
 
       {/* Toolbar */}
       <div className="toolbar">
@@ -238,9 +354,21 @@ const handleMouseUp = (e) => {
   {isTextMode ? "Brush" : "Text"}
 </button>
 
-        <button onClick={handleClearCanvas}>
-          Clear Canvas
-        </button>
+<button onClick={handleClearCanvas}>
+  Clear Canvas
+</button>
+
+<button onClick={saveWhiteboard}>
+  Save Whiteboard
+</button>
+
+<span>
+  {saveStatus === "Saving..."
+    ? "⏳ Saving..."
+    : saveStatus === "Saved"
+    ? "✅ Saved"
+    : "❌ Save failed"}
+</span>
       </div>
 
       {/* Whiteboard */}

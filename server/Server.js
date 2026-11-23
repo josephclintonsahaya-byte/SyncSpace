@@ -7,6 +7,9 @@ const { Server } = require("socket.io");
 const cors = require("cors");
 const connectDB = require("./db");
 
+const { Whiteboard } = require("./models/Whiteboard");
+
+
 const app = express();
 
 app.use(cors({
@@ -34,6 +37,50 @@ app.get("/api/about", (req, res) => {
     version: "1.0.0"
   });
 });
+
+app.post("/api/whiteboards", async (req, res) => {
+  try {
+    const { roomId, drawings } = req.body;
+
+    const board = await Whiteboard.findOneAndUpdate(
+      { roomId },
+      { drawings },
+      { new: true, upsert: true }
+    );
+
+    res.status(200).json({
+      message: "Whiteboard saved successfully",
+      board,
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to save whiteboard",
+      error: error.message,
+    });
+  }
+});
+
+app.get("/api/whiteboards/:roomId", async (req, res) => {
+  try {
+    const { roomId } = req.params;
+
+    const board = await Whiteboard.findOne({ roomId });
+
+    if (!board) {
+      return res.status(404).json({
+        message: "Whiteboard not found",
+      });
+    }
+
+    res.status(200).json(board);
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to load whiteboard",
+      error: error.message,
+    });
+  }
+});
+
 
 io.on("connection", (socket) => {
   console.log("User connected:", socket.id);
