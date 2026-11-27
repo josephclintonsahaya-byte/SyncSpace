@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Stage, Layer, Line, Rect, Text } from "react-konva";
 import socket from "./socket";
+import Register from "./components/Register";
 
 
 function App() {
@@ -459,6 +460,8 @@ const saveWhiteboard = async () => {
 )}
 </Layer>
       </Stage>
+
+      <Register />
     </div>
   );
 }

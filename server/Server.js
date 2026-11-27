@@ -7,7 +7,8 @@ const { Server } = require("socket.io");
 const cors = require("cors");
 const connectDB = require("./db");
 
-const { Whiteboard } = require("./models/Whiteboard");
+const { Whiteboard } = require("./models/whiteboard");
+const authRoutes = require("./routes/auth");
 
 
 const app = express();
@@ -17,6 +18,7 @@ app.use(cors({
 }));
 
 app.use(express.json());
+app.use("/api/auth", authRoutes);
 
 const server = http.createServer(app);
 
